@@ -6,6 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
   return {
+    base: '/ADOdoc/',
     plugins: [
       {
         name: 'icon-cache-headers',
@@ -37,36 +38,36 @@ export default defineConfig(() => {
           'pwa-maskable-512x512.png',
         ],
         manifest: {
-          id: '/',
+          id: '/ADOdoc/',
           name: 'ADOdoc',
           short_name: 'ADOdoc',
           description: 'ADOdoc - Editor e gestione documenti stile Google Docs con salvataggio in tempo reale e sincronizzazione Google Drive.',
           theme_color: '#1e293b',
           background_color: '#ffffff',
           display: 'standalone',
-          start_url: '/',
-          scope: '/',
+          start_url: '/ADOdoc/',
+          scope: '/ADOdoc/',
           icons: [
             {
-              src: '/apple-touch-icon.png?v=3',
+              src: 'apple-touch-icon.png?v=3',
               sizes: '180x180',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/pwa-192x192.png?v=3',
+              src: 'pwa-192x192.png?v=3',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/pwa-512x512.png?v=3',
+              src: 'pwa-512x512.png?v=3',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/pwa-maskable-512x512.png?v=3',
+              src: 'pwa-maskable-512x512.png?v=3',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable',
