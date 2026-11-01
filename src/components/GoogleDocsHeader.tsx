@@ -91,7 +91,7 @@ export const GoogleDocsHeader: React.FC<GoogleDocsHeaderProps> = ({
       <div className="bg-[#1e293b] text-white px-3 sm:px-4 py-1.5 flex items-center justify-between border-b border-slate-800 shadow-2xs">
         <div className="flex items-center gap-2 sm:gap-2.5">
           <img
-            src="/apple-touch-icon.png"
+            src="apple-touch-icon.png"
             alt="ADOdoc Logo"
             className="w-6 h-6 sm:w-7 sm:h-7 rounded-md object-cover border border-white/20 shadow-xs shrink-0"
           />
@@ -566,7 +566,7 @@ export const GoogleDocsHeader: React.FC<GoogleDocsHeaderProps> = ({
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg overflow-hidden border border-gray-200 shadow-2xs shrink-0">
                   <img
-                    src="/apple-touch-icon.png"
+                    src="apple-touch-icon.png"
                     alt="ADOdoc"
                     className="w-full h-full object-cover"
                   />
