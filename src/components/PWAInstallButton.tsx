@@ -21,7 +21,7 @@ export const PWAInstallButton: React.FC = () => {
   const preUrl = 'https://ais-pre-vbo7u22ysnglcm36pshr5f-160749320957.europe-west3.run.app';
   
   const [selectedUrlType, setSelectedUrlType] = useState<'dev' | 'pre'>('dev');
-  const appUrl = window.location.origin;
+  const appUrl = window.location.origin + import.meta.env.BASE_URL;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(appUrl)}`;
 
   const handleCopyLink = async () => {
