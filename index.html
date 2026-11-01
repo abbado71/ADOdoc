@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ADOdoc</title>
+    <meta name="description" content="ADOdoc - Editor e gestione documenti stile Google Docs con salvataggio in tempo reale e sincronizzazione Google Drive." />
+    <meta property="og:title" content="ADOdoc" />
+    <meta property="og:description" content="ADOdoc - Editor e gestione documenti stile Google Docs con salvataggio in tempo reale e sincronizzazione Google Drive." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="ADOdoc" />
+
+    <!-- Apple Touch Icons for iOS Safari Home Screen -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png?v=3" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/apple-touch-icon-167x167.png?v=3" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png?v=3" />
+    <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon-120x120.png?v=3" />
+    <link rel="apple-touch-icon-precomposed" href="/apple-touch-icon.png?v=3" />
+    <link rel="apple-touch-icon-precomposed" sizes="180x180" href="/apple-touch-icon-180x180.png?v=3" />
+
+    <!-- Standard Favicons -->
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png?v=3" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png?v=3" />
+    <link rel="shortcut icon" href="/favicon.ico?v=3" />
+    <meta property="og:image" content="/pwa-512x512.png?v=3" />
+
+    <script>
+      try {
+        var base = window.location.origin;
+        document.querySelectorAll('link[rel*="apple-touch-icon"]').forEach(function(el) {
+          var h = el.getAttribute('href');
+          if (h && h.startsWith('/')) {
+            el.href = base + h;
+          }
+        });
+      } catch (e) {}
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&family=Source+Code+Pro:wght@400;500&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-[#f9fbfd] text-[#202124] antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

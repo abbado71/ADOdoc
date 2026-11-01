@@ -1,0 +1,6 @@
+{
+  "name": "ADOdoc - Note & Documenti Google Drive",
+  "description": "Esplora, cerca e modifica argomenti con anteprima stile Google Docs e salvataggio in tempo reale, sincronizzato con Google Drive.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
