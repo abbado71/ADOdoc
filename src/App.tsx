@@ -191,11 +191,22 @@ export default function App() {
     };
   }, []);
 
-  // Persist topics to local storage and IndexedDB whenever they change
+  // Debounced persistence of topics to local storage and IndexedDB to avoid UI freeze while typing
+  const localSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (topics.length > 0) {
-      saveStoredTopics(topics);
+      if (localSaveTimerRef.current) {
+        clearTimeout(localSaveTimerRef.current);
+      }
+      localSaveTimerRef.current = setTimeout(() => {
+        saveStoredTopics(topics);
+      }, 1500);
     }
+    return () => {
+      if (localSaveTimerRef.current) {
+        clearTimeout(localSaveTimerRef.current);
+      }
+    };
   }, [topics]);
 
   // Centralized bi-directional cloud sync across all 5 user devices
@@ -381,18 +392,15 @@ export default function App() {
     showToast('Disconnessione da Google completata');
   };
 
-  // Real-time update handler for current topic (no version history bloat)
+  // Real-time update handler for current topic (in-memory for maximum typing performance, zero network lag)
   const handleUpdateTopic = useCallback(
     (updatedFields: Partial<Topic>, isSignificantEdit = false) => {
       if (!currentTopic) return;
 
-      setSaveStatus('saving');
-
+      const now = new Date().toISOString();
       setTopics((prevTopics) => {
         return prevTopics.map((item) => {
           if (item.id !== currentTopic.id) return item;
-
-          const now = new Date().toISOString();
           return {
             ...item,
             ...updatedFields,
@@ -407,51 +415,13 @@ export default function App() {
         clearTimeout(autoSaveTimerRef.current);
       }
 
-      // Debounce finalize save & cloud background sync
-      autoSaveTimerRef.current = setTimeout(async () => {
-        // If connected to Google Drive and online, sync to ADOdoc folder in background
-        if (accessToken && navigator.onLine) {
-          try {
-            const driveRes = await saveTopicToGoogleDrive(
-              {
-                ...currentTopic,
-                ...updatedFields,
-                updatedAt: new Date().toISOString(),
-                versions: [],
-              },
-              accessToken
-            );
-
-            // Update topic with googleDriveFileId if missing
-            setTopics((prev) =>
-              prev.map((t) =>
-                t.id === currentTopic.id
-                  ? { ...t, googleDriveFileId: driveRes.fileId, googleDriveSyncedAt: driveRes.modifiedTime }
-                  : t
-              )
-            );
-
-            // Also keep central archive updated so other devices pull changes on focus
-            saveAllTopicsBackupToDrive(topicsRef.current, accessToken).catch((err) => {
-              if (isTokenExpired(err)) {
-                setAccessToken(null);
-                clearCachedAccessToken();
-              }
-            });
-            setSaveStatus('synced-drive');
-          } catch (autoErr) {
-            if (isTokenExpired(autoErr)) {
-              setAccessToken(null);
-              clearCachedAccessToken();
-            }
-            setSaveStatus('saved');
-          }
-        } else {
-          setSaveStatus('saved');
-        }
-      }, 700);
+      // Lightweight status change without blocking main thread or calling Google Drive during typing
+      setSaveStatus('saving');
+      autoSaveTimerRef.current = setTimeout(() => {
+        setSaveStatus('saved');
+      }, 500);
     },
-    [currentTopic, accessToken]
+    [currentTopic]
   );
 
   // Inserts an image file picked from the device into the active document with client-side downscaling and instant persistence
@@ -506,18 +476,23 @@ export default function App() {
     [currentTopic, viewMode, handleUpdateTopic, showToast, topics]
   );
 
-  // Manual Save button trigger
+  // Manual Save and Mode-Switch Save handler (commits to disk and syncs to Drive)
   const handleManualSave = useCallback(async () => {
     if (!currentTopic) return;
 
     setSaveStatus('saving');
     const now = new Date().toISOString();
 
+    // Check if DOM content has newer edits
+    const activeEl = document.querySelector('.document-content') as HTMLElement;
+    const latestContent = activeEl ? activeEl.innerHTML : currentTopic.content;
+
     let driveFileId = currentTopic.googleDriveFileId;
     let driveSyncedAt = currentTopic.googleDriveSyncedAt;
 
     const updatedTopic: Topic = {
       ...currentTopic,
+      content: latestContent,
       updatedAt: now,
       versions: [], // No version snapshots kept
     };
@@ -544,7 +519,7 @@ export default function App() {
         await saveAllTopicsBackupToDrive(finalList, accessToken);
 
         setSaveStatus('synced-drive');
-        showToast('Documento salvato e sincronizzato nella cartella ADOdoc su Google Drive!');
+        showToast('Documento salvato e sincronizzato su Google Drive!');
       } catch (err: unknown) {
         if (isTokenExpired(err)) {
           setAccessToken(null);
@@ -561,6 +536,29 @@ export default function App() {
       showToast('Documento salvato sul dispositivo!');
     }
   }, [currentTopic, accessToken, showToast, topics]);
+
+  // Toggle between Edit and View mode: exiting Edit mode immediately commits and syncs to Drive
+  const handleToggleViewMode = useCallback(async () => {
+    if (viewMode === 'edit') {
+      setViewMode('view');
+      // On switching to view mode: commit to local storage and sync to Google Drive
+      await handleManualSave();
+    } else {
+      setViewMode('edit');
+    }
+  }, [viewMode, handleManualSave]);
+
+  // Keyboard shortcut: Ctrl+S / Cmd+S for instant Save & Drive Sync
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleManualSave();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleManualSave]);
 
   // Create a new topic
   const handleCreateTopic = async (newTopicData: Pick<Topic, 'title' | 'category' | 'content'>) => {
@@ -718,7 +716,7 @@ export default function App() {
         <GoogleDocsHeader
           topic={currentTopic}
           viewMode={viewMode}
-          onToggleViewMode={() => setViewMode(viewMode === 'edit' ? 'view' : 'edit')}
+          onToggleViewMode={handleToggleViewMode}
           onTitleChange={(newTitle) => handleUpdateTopic({ title: newTitle }, true)}
           saveStatus={saveStatus}
           user={user}
@@ -757,7 +755,12 @@ export default function App() {
         <TopicSidebar
           topics={topics}
           selectedTopicId={selectedTopicId}
-          onSelectTopic={(t) => {
+          onSelectTopic={async (t) => {
+            if (t.id === selectedTopicId) return;
+            if (viewMode === 'edit') {
+              // Commit changes before changing topic
+              await handleManualSave();
+            }
             setSelectedTopicId(t.id);
             if (window.innerWidth < 1024) {
               setIsSidebarOpen(false);
@@ -781,7 +784,7 @@ export default function App() {
                 zoomLevel={zoomLevel}
                 existingCategories={existingCategories}
                 onUpdateTopic={handleUpdateTopic}
-                onToggleViewMode={() => setViewMode(viewMode === 'edit' ? 'view' : 'edit')}
+                onToggleViewMode={handleToggleViewMode}
                 onNotify={showToast}
               />
             </div>
