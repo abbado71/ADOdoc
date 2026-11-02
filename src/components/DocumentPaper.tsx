@@ -237,20 +237,72 @@ export const DocumentPaper: React.FC<DocumentPaperProps> = ({
   };
 
   /**
-   * Handles pasting images directly from system clipboard (Ctrl+V or mobile Paste)
+   * Handles pasting images directly from system clipboard (Ctrl+V, screenshots, copied images from web)
    */
-  const handlePaste = (e: React.ClipboardEvent) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    const clipboardData = e.clipboardData;
+    if (!clipboardData) return;
 
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') !== -1) {
-        e.preventDefault();
-        const file = items[i].getAsFile();
-        if (file) {
-          insertImageFile(file);
+    // 1. Check items for image files
+    const items = clipboardData.items;
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          e.preventDefault();
+          const file = items[i].getAsFile();
+          if (file) {
+            await insertImageFile(file);
+            return;
+          }
         }
-        return;
+      }
+    }
+
+    // 2. Check files property
+    const files = clipboardData.files;
+    if (files && files.length > 0) {
+      for (let i = 0; i < files.length; i++) {
+        if (files[i].type.startsWith('image/')) {
+          e.preventDefault();
+          await insertImageFile(files[i]);
+          return;
+        }
+      }
+    }
+
+    // 3. Check HTML for <img> tags (e.g. copying image from a web page)
+    const htmlData = clipboardData.getData('text/html');
+    if (htmlData) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlData, 'text/html');
+      const imgEl = doc.querySelector('img');
+      if (imgEl && imgEl.src) {
+        e.preventDefault();
+        const imgSrc = imgEl.src;
+        try {
+          if (onNotify) onNotify('Caricamento immagine in corso...');
+          const res = await fetch(imgSrc);
+          const blob = await res.blob();
+          if (blob.type.startsWith('image/')) {
+            const file = new File([blob], 'pasted-image.png', { type: blob.type });
+            await insertImageFile(file);
+            return;
+          }
+        } catch (fetchErr) {
+          console.warn('Impossibile recuperare l\'immagine dagli appunti:', fetchErr);
+          // Fallback: insert the image tag directly if fetch fails due to CORS
+          const fallbackHtml = `<p style="text-align: center;"><img src="${imgSrc}" alt="Immagine incollata" style="width: 75%; max-width: 100%; height: auto; border-radius: 8px; margin: 12px auto; display: block; box-shadow: 0 1px 3px rgba(0,0,0,0.12); cursor: pointer;" /></p><p><br></p>`;
+          if (contentRef.current) {
+            contentRef.current.focus();
+            const inserted = document.execCommand('insertHTML', false, fallbackHtml);
+            if (!inserted) {
+              contentRef.current.innerHTML += fallbackHtml;
+            }
+            handleContentInput();
+            if (onNotify) onNotify('Immagine inserita!');
+          }
+          return;
+        }
       }
     }
   };
