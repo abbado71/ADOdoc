@@ -17,6 +17,8 @@ import {
   Smartphone,
   Download,
   FileArchive,
+  BookOpen,
+  Layers,
 } from 'lucide-react';
 import { Topic, ViewMode } from '../types';
 import { User } from 'firebase/auth';
@@ -38,6 +40,8 @@ interface GoogleDocsHeaderProps {
   isSidebarOpen: boolean;
   onPrint: () => void;
   onExportAllPdf?: () => void;
+  isCoverPage?: boolean;
+  onGoToCover?: () => void;
 }
 
 export const GoogleDocsHeader: React.FC<GoogleDocsHeaderProps> = ({
@@ -56,6 +60,8 @@ export const GoogleDocsHeader: React.FC<GoogleDocsHeaderProps> = ({
   isSidebarOpen,
   onPrint,
   onExportAllPdf,
+  isCoverPage = false,
+  onGoToCover,
 }) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(topic?.title || '');
@@ -89,11 +95,16 @@ export const GoogleDocsHeader: React.FC<GoogleDocsHeaderProps> = ({
     <header className="bg-white border-b border-gray-200 select-none sticky top-0 z-40">
       {/* ================= PRIMO RIGO IN TESTA A TUTTO: BRAND BAR "ADOdoc" ================= */}
       <div className="bg-[#1e293b] text-white px-3 sm:px-4 py-1.5 flex items-center justify-between border-b border-slate-800 shadow-2xs">
-        <div className="flex items-center gap-2 sm:gap-2.5">
+        <button
+          type="button"
+          onClick={onGoToCover}
+          className="flex items-center gap-2 sm:gap-2.5 text-left hover:opacity-90 transition-opacity cursor-pointer group"
+          title="Torna alla Pagina Iniziale (Copertina)"
+        >
           <img
-            src="apple-touch-icon.png"
+            src="/apple-touch-icon.png"
             alt="ADOdoc Logo"
-            className="w-6 h-6 sm:w-7 sm:h-7 rounded-md object-cover border border-white/20 shadow-xs shrink-0"
+            className="w-6 h-6 sm:w-7 sm:h-7 rounded-md object-cover border border-white/20 shadow-xs shrink-0 group-hover:scale-105 transition-transform"
           />
           <div className="flex items-center gap-2">
             <span className="text-sm sm:text-base font-bold text-white tracking-tight leading-none">
@@ -103,7 +114,7 @@ export const GoogleDocsHeader: React.FC<GoogleDocsHeaderProps> = ({
               Editor &amp; Archivio
             </span>
           </div>
-        </div>
+        </button>
 
         <div className="flex items-center gap-2">
           {/* Drive status / Connect button (visible on all screens including mobile/iOS) */}
@@ -163,7 +174,11 @@ export const GoogleDocsHeader: React.FC<GoogleDocsHeaderProps> = ({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               {/* Document title: editable ONLY in edit mode */}
-              {viewMode === 'edit' ? (
+              {isCoverPage || !topic ? (
+                <span className="text-base md:text-lg font-semibold text-gray-800 px-1.5 py-0.5">
+                  Pagina Iniziale
+                </span>
+              ) : viewMode === 'edit' ? (
                 isEditingTitle ? (
                   <input
                     type="text"
@@ -299,28 +314,30 @@ export const GoogleDocsHeader: React.FC<GoogleDocsHeaderProps> = ({
 
         {/* Right Side Desktop Actions */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Edit / View Mode Switcher */}
-          <button
-            onClick={onToggleViewMode}
-            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-xs transition-all ${
-              viewMode === 'edit'
-                ? 'bg-amber-500 hover:bg-amber-600 text-white ring-2 ring-amber-300'
-                : 'bg-blue-600 hover:bg-blue-700 text-white'
-            }`}
-            title={viewMode === 'edit' ? 'Termina modifica e torna alla visualizzazione' : 'Modifica questo argomento'}
-          >
-            {viewMode === 'edit' ? (
-              <>
-                <Eye className="w-4 h-4" />
-                <span>Visualizza</span>
-              </>
-            ) : (
-              <>
-                <Edit3 className="w-4 h-4" />
-                <span>Modifica Argomento</span>
-              </>
-            )}
-          </button>
+          {/* Edit / View Mode Switcher - only when topic is active */}
+          {!isCoverPage && topic && (
+            <button
+              onClick={onToggleViewMode}
+              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-xs transition-all ${
+                viewMode === 'edit'
+                  ? 'bg-amber-500 hover:bg-amber-600 text-white ring-2 ring-amber-300'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+              title={viewMode === 'edit' ? 'Termina modifica e torna alla visualizzazione' : 'Modifica questo argomento'}
+            >
+              {viewMode === 'edit' ? (
+                <>
+                  <Eye className="w-4 h-4" />
+                  <span>Visualizza</span>
+                </>
+              ) : (
+                <>
+                  <Edit3 className="w-4 h-4" />
+                  <span>Modifica Argomento</span>
+                </>
+              )}
+            </button>
+          )}
 
           {/* PWA Install Button */}
           <PWAInstallButton />
@@ -436,7 +453,11 @@ export const GoogleDocsHeader: React.FC<GoogleDocsHeaderProps> = ({
 
           {/* Truncated Mobile Title: editable ONLY in edit mode */}
           <div className="min-w-0 flex-1">
-            {viewMode === 'edit' ? (
+            {isCoverPage || !topic ? (
+              <span className="text-sm font-bold text-gray-900 tracking-tight block">
+                ADOdoc
+              </span>
+            ) : viewMode === 'edit' ? (
               <button
                 onClick={() => setIsEditingTitle(true)}
                 className="text-xs sm:text-sm font-semibold text-gray-900 truncate text-left block w-full hover:underline"
@@ -455,13 +476,13 @@ export const GoogleDocsHeader: React.FC<GoogleDocsHeaderProps> = ({
         {/* Right: Save Status Icon + Toggle Edit/View + More Actions (...) */}
         <div className="flex items-center gap-1.5 shrink-0 pl-1">
           {/* Status Indicator on Mobile */}
-          {saveStatus === 'saving' && (
+          {!isCoverPage && saveStatus === 'saving' && (
             <div className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
               <RefreshCw className="w-3 h-3 text-blue-600 animate-spin" />
               <span>Sync...</span>
             </div>
           )}
-          {saveStatus === 'saved' && (
+          {!isCoverPage && saveStatus === 'saved' && (
             <div
               className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-gray-500 bg-gray-100 border border-gray-200 shrink-0"
               title="Salvato in locale sul dispositivo"
@@ -481,27 +502,38 @@ export const GoogleDocsHeader: React.FC<GoogleDocsHeaderProps> = ({
             </button>
           )}
 
-          {/* Quick Edit/View Toggle Button */}
-          <button
-            onClick={onToggleViewMode}
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold shadow-2xs transition-all ${
-              viewMode === 'edit'
-                ? 'bg-amber-500 text-white ring-1 ring-amber-300'
-                : 'bg-blue-600 text-white'
-            }`}
-          >
-            {viewMode === 'edit' ? (
-              <>
-                <Eye className="w-3.5 h-3.5" />
-                <span>Vedi</span>
-              </>
-            ) : (
-              <>
-                <Edit3 className="w-3.5 h-3.5" />
-                <span>Modifica</span>
-              </>
-            )}
-          </button>
+          {/* Quick Action Button: On Cover show 'Indice', otherwise Edit/View Toggle */}
+          {isCoverPage || !topic ? (
+            <button
+              onClick={onToggleSidebar}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-2xs transition-all active:scale-95 cursor-pointer"
+              title="Apri l'indice degli argomenti"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Indice</span>
+            </button>
+          ) : (
+            <button
+              onClick={onToggleViewMode}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold shadow-2xs transition-all ${
+                viewMode === 'edit'
+                  ? 'bg-amber-500 text-white ring-1 ring-amber-300'
+                  : 'bg-blue-600 text-white'
+              }`}
+            >
+              {viewMode === 'edit' ? (
+                <>
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Vedi</span>
+                </>
+              ) : (
+                <>
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Modifica</span>
+                </>
+              )}
+            </button>
+          )}
 
           {/* Mobile Overflow Menu Button (...) */}
           <button
@@ -566,7 +598,7 @@ export const GoogleDocsHeader: React.FC<GoogleDocsHeaderProps> = ({
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg overflow-hidden border border-gray-200 shadow-2xs shrink-0">
                   <img
-                    src="apple-touch-icon.png"
+                    src="/apple-touch-icon.png"
                     alt="ADOdoc"
                     className="w-full h-full object-cover"
                   />
@@ -626,6 +658,24 @@ export const GoogleDocsHeader: React.FC<GoogleDocsHeaderProps> = ({
                   <span className="text-[10px] font-normal text-gray-500">Cerca per titolo o categoria</span>
                 </div>
               </button>
+
+              {onGoToCover && (
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onGoToCover();
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-gray-800 hover:bg-blue-50 active:bg-blue-100 rounded-xl transition-colors text-left"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="block font-semibold">Pagina Iniziale (Copertina)</span>
+                    <span className="text-[10px] font-normal text-gray-500">Visualizza copertina ADOdoc</span>
+                  </div>
+                </button>
+              )}
 
               <button
                 onClick={() => {
