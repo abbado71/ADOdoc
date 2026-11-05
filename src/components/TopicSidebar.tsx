@@ -12,6 +12,7 @@ import {
   Folder,
   ChevronDown,
   ChevronUp,
+  BookOpen,
 } from 'lucide-react';
 import { Topic } from '../types';
 
@@ -23,6 +24,7 @@ interface TopicSidebarProps {
   onRequestDeleteTopic: (topic: Topic) => void;
   isOpen: boolean;
   onClose: () => void;
+  onGoToCover?: () => void;
 }
 
 export const TopicSidebar: React.FC<TopicSidebarProps> = ({
@@ -33,6 +35,7 @@ export const TopicSidebar: React.FC<TopicSidebarProps> = ({
   onRequestDeleteTopic,
   isOpen,
   onClose,
+  onGoToCover,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Tutti');
@@ -292,6 +295,33 @@ export const TopicSidebar: React.FC<TopicSidebarProps> = ({
 
         {/* Clean Topic Card List (Solo Titolo e Categoria) */}
         <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5">
+          {/* Quick Link to Cover Page */}
+          {onGoToCover && !searchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                onGoToCover();
+                if (window.innerWidth < 1024) {
+                  onClose();
+                }
+              }}
+              className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-semibold transition-all border cursor-pointer mb-2 ${
+                !selectedTopicId
+                  ? 'bg-blue-50 text-blue-800 border-blue-400 shadow-xs ring-1 ring-blue-300/40'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-200 hover:border-gray-300'
+              }`}
+              title="Visualizza la pagina iniziale di copertina"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-md bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                  <BookOpen className="w-3.5 h-3.5" />
+                </div>
+                <span>Pagina Iniziale (Copertina)</span>
+              </div>
+              <span className="text-[10px] text-gray-400 font-normal">ADOdoc</span>
+            </button>
+          )}
+
           {filteredTopics.length === 0 ? (
             <div className="p-8 text-center text-gray-400">
               <FileText className="w-8 h-8 mx-auto mb-2 text-gray-300" />
