@@ -26,7 +26,7 @@ export const CoverPage: React.FC<CoverPageProps> = ({
           {/* App Logo Emblem */}
           <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shadow-lg border-2 border-gray-100 flex items-center justify-center bg-slate-900 transition-transform hover:scale-105 duration-200">
             <img
-              src="/apple-touch-icon.png"
+              src="apple-touch-icon.png"
               alt="ADOdoc Logo"
               className="w-full h-full object-cover"
             />
