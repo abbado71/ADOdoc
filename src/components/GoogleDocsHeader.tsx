@@ -102,7 +102,7 @@ export const GoogleDocsHeader: React.FC<GoogleDocsHeaderProps> = ({
           title="Torna alla Pagina Iniziale (Copertina)"
         >
           <img
-            src="/apple-touch-icon.png"
+            src="apple-touch-icon.png"
             alt="ADOdoc Logo"
             className="w-6 h-6 sm:w-7 sm:h-7 rounded-md object-cover border border-white/20 shadow-xs shrink-0 group-hover:scale-105 transition-transform"
           />
