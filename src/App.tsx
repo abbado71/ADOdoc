@@ -44,11 +44,29 @@ import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { PrintExportModal } from './components/PrintExportModal';
 import { ExportAllPdfModal } from './components/ExportAllPdfModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { CoverPage } from './components/CoverPage';
+import { APP_VERSION } from './config';
 
 export default function App() {
+  // Cold start detection: when app is closed on mobile or PC and reopened, sessionStorage is cleared.
+  // When running in background or refreshed in same session, sessionStorage persists.
+  const isFreshSessionLaunch =
+    typeof window !== 'undefined' && !sessionStorage.getItem('adodoc_session_active');
+
+  if (isFreshSessionLaunch && typeof window !== 'undefined') {
+    sessionStorage.setItem('adodoc_session_active', 'true');
+  }
+
   // Topics state
   const [topics, setTopics] = useState<Topic[]>(() => loadStoredTopics());
-  const [selectedTopicId, setSelectedTopicId] = useState<string>(() => {
+
+  // Cover page state: true on cold launch (closed app restart)
+  const [isCoverPage, setIsCoverPage] = useState<boolean>(() => isFreshSessionLaunch);
+
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(() => {
+    if (isFreshSessionLaunch) {
+      return null;
+    }
     const list = loadStoredTopics();
     const lastActive =
       typeof window !== 'undefined'
@@ -57,7 +75,7 @@ export default function App() {
     if (lastActive && list.some((t) => t.id === lastActive)) {
       return lastActive;
     }
-    return list[0]?.id || '';
+    return null;
   });
 
   // UI state
@@ -124,8 +142,11 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Derived current topic
-  const currentTopic = topics.find((t) => t.id === selectedTopicId) || topics[0] || null;
+  // Derived current topic: null when on cover page or when no topic is selected
+  const currentTopic = useMemo(() => {
+    if (isCoverPage || !selectedTopicId) return null;
+    return topics.find((t) => t.id === selectedTopicId) || null;
+  }, [isCoverPage, selectedTopicId, topics]);
 
   // Extract all dynamic categories used across existing topics
   const existingCategories = useMemo(() => {
@@ -176,7 +197,7 @@ export default function App() {
           if (cleaned.length > 0) {
             setTopics(cleaned);
             const lastActive = localStorage.getItem('docu_last_active_topic_id');
-            if (lastActive && cleaned.some((t) => t.id === lastActive)) {
+            if (!isCoverPage && lastActive && cleaned.some((t) => t.id === lastActive)) {
               setSelectedTopicId(lastActive);
             }
           }
@@ -548,6 +569,15 @@ export default function App() {
     }
   }, [viewMode, handleManualSave]);
 
+  // Return to the initial Cover Page
+  const handleGoToCover = useCallback(async () => {
+    if (viewMode === 'edit') {
+      await handleManualSave();
+    }
+    setIsCoverPage(true);
+    setSelectedTopicId(null);
+  }, [viewMode, handleManualSave]);
+
   // Keyboard shortcut: Ctrl+S / Cmd+S for instant Save & Drive Sync
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -577,6 +607,7 @@ export default function App() {
     const nextTopics = [newTopic, ...topics];
     setTopics(nextTopics);
     setSelectedTopicId(id);
+    setIsCoverPage(false);
     setViewMode('edit'); // Open directly in edit mode on a clean empty canvas
     flushStoredTopicsSync(nextTopics);
     showToast(`Documento "${newTopic.title}" creato!`);
@@ -628,7 +659,12 @@ export default function App() {
       flushStoredTopicsSync(remaining);
 
       if (selectedTopicId === topicToDelete.id) {
-        setSelectedTopicId(remaining[0]?.id || '');
+        if (remaining.length > 0) {
+          setSelectedTopicId(remaining[0].id);
+        } else {
+          setSelectedTopicId(null);
+          setIsCoverPage(true);
+        }
       }
 
       // 3. Remove from Google Drive if user is authenticated with Drive
@@ -729,24 +765,30 @@ export default function App() {
           isSidebarOpen={isSidebarOpen}
           onPrint={handleOpenPrintModal}
           onExportAllPdf={() => setIsExportAllModalOpen(true)}
+          isCoverPage={isCoverPage}
+          onGoToCover={handleGoToCover}
         />
 
-        {/* Google Docs Toolbar with Image Insertion */}
-        <GoogleDocsToolbar
-          viewMode={viewMode}
-          formatting={formatting}
-          onChangeFormatting={(changes) => setFormatting((prev) => ({ ...prev, ...changes }))}
-          onApplyCommand={handleApplyCommand}
-          onPrint={handleOpenPrintModal}
-          onManualSave={handleManualSave}
-          onInsertImageFile={handleInsertImageFile}
-          zoomLevel={zoomLevel}
-          onChangeZoom={setZoomLevel}
-          isSaving={saveStatus === 'saving'}
-        />
+        {/* Google Docs Toolbar with Image Insertion (only when editing/viewing a topic) */}
+        {!isCoverPage && currentTopic && (
+          <>
+            <GoogleDocsToolbar
+              viewMode={viewMode}
+              formatting={formatting}
+              onChangeFormatting={(changes) => setFormatting((prev) => ({ ...prev, ...changes }))}
+              onApplyCommand={handleApplyCommand}
+              onPrint={handleOpenPrintModal}
+              onManualSave={handleManualSave}
+              onInsertImageFile={handleInsertImageFile}
+              zoomLevel={zoomLevel}
+              onChangeZoom={setZoomLevel}
+              isSaving={saveStatus === 'saving'}
+            />
 
-        {/* Horizontal Ruler for Google Docs styling */}
-        <GoogleDocsRuler />
+            {/* Horizontal Ruler for Google Docs styling */}
+            <GoogleDocsRuler />
+          </>
+        )}
       </div>
 
       {/* Main Content Area */}
@@ -756,12 +798,13 @@ export default function App() {
           topics={topics}
           selectedTopicId={selectedTopicId}
           onSelectTopic={async (t) => {
-            if (t.id === selectedTopicId) return;
+            if (t.id === selectedTopicId && !isCoverPage) return;
             if (viewMode === 'edit') {
               // Commit changes before changing topic
               await handleManualSave();
             }
             setSelectedTopicId(t.id);
+            setIsCoverPage(false);
             if (window.innerWidth < 1024) {
               setIsSidebarOpen(false);
             }
@@ -770,11 +813,19 @@ export default function App() {
           onRequestDeleteTopic={(t) => setTopicToDelete(t)}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
+          onGoToCover={handleGoToCover}
         />
 
-        {/* Document View Canvas */}
+        {/* Document View Canvas or Initial Cover Page */}
         <main className="flex-1 overflow-y-auto p-2 sm:p-5 md:p-8 flex justify-center bg-[#f0f4f9] print:bg-white print:p-0 print:overflow-visible print:block print:w-full print:m-0">
-          {currentTopic ? (
+          {isCoverPage || !currentTopic ? (
+            <CoverPage
+              onOpenSidebar={() => setIsSidebarOpen(true)}
+              onOpenNewTopicModal={() => setIsNewModalOpen(true)}
+              version={APP_VERSION}
+              hasTopics={topics.length > 0}
+            />
+          ) : (
             <div className="w-full max-w-[850px] print:max-w-none print:w-full">
               <DocumentPaper
                 key={currentTopic.id}
@@ -787,21 +838,6 @@ export default function App() {
                 onToggleViewMode={handleToggleViewMode}
                 onNotify={showToast}
               />
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center p-8 sm:p-12 text-center text-gray-500 my-auto">
-              <p className="text-base font-semibold text-gray-700 mb-2">
-                Nessun argomento disponibile
-              </p>
-              <p className="text-xs text-gray-500 mb-4 max-w-sm">
-                Crea un nuovo argomento per iniziare a prendere appunti e salvare documenti.
-              </p>
-              <button
-                onClick={() => setIsNewModalOpen(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 shadow-sm"
-              >
-                Crea Nuovo Argomento
-              </button>
             </div>
           )}
         </main>
