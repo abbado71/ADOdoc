@@ -1,7 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getAuth,
-  signInWithPopup,
+  signInWithCredential,
   GoogleAuthProvider,
   onAuthStateChanged,
   User,
@@ -15,13 +15,13 @@ export const auth = getAuth(app);
 
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 
-const provider = new GoogleAuthProvider();
-provider.addScope(DRIVE_SCOPE);
+// ID client OAuth "Applicazione web" (Firebase Console > Authentication > Google > Web SDK configuration)
+const GOOGLE_CLIENT_ID = '604961682001-2g89baca9b00qniga0livdp8iffnu0ha.apps.googleusercontent.com';
 
-// Use persistent localStorage so tokens survive iOS app closures, backgrounding, and Safari tab switches
 const TOKEN_STORAGE_KEY = 'adodoc_drive_access_token_v3';
 
-let isSigningIn = false;
+declare const google: any;
+
 let cachedAccessToken: string | null = null;
 
 try {
@@ -32,9 +32,26 @@ try {
   // Ignore
 }
 
-/**
- * Checks if an error is due to an expired or invalid OAuth access token.
- */
+/** Carica Google Identity Services una sola volta */
+const loadGis = (): Promise<void> =>
+  new Promise((resolve, reject) => {
+    if ((window as any).google?.accounts?.oauth2) return resolve();
+    const existing = document.querySelector('script[data-gis]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', () => reject(new Error('Caricamento Google non riuscito')));
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true;
+    s.defer = true;
+    s.setAttribute('data-gis', '1');
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Caricamento Google non riuscito'));
+    document.head.appendChild(s);
+  });
+
 export const isTokenExpired = (err: unknown): boolean => {
   if (!err) return false;
   const msg = err instanceof Error ? err.message : String(err);
@@ -46,9 +63,6 @@ export const isTokenExpired = (err: unknown): boolean => {
   );
 };
 
-/**
- * Clears the cached access token when expired or on logout.
- */
 export const clearCachedAccessToken = () => {
   cachedAccessToken = null;
   if (typeof window !== 'undefined') {
@@ -60,9 +74,6 @@ export const clearCachedAccessToken = () => {
   }
 };
 
-/**
- * Initializes the auth listener to monitor sign-in state across restarts.
- */
 export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
   onAuthFailure?: () => void
@@ -76,14 +87,7 @@ export const initAuth = (
           // Ignore
         }
       }
-
-      // If we have an access token, notify success with the token
-      if (cachedAccessToken) {
-        if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
-      } else {
-        // User is known in Firebase, but needs fresh OAuth token for Drive
-        if (onAuthSuccess) onAuthSuccess(user, '');
-      }
+      if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken || '');
     } else {
       clearCachedAccessToken();
       if (onAuthFailure) onAuthFailure();
@@ -92,38 +96,47 @@ export const initAuth = (
 };
 
 /**
- * Initiates the Google Sign-In popup with Google Drive scope.
- * Works on Desktop and Mobile (iOS / Android).
+ * Login con Google Identity Services (nessun problema COOP / window.closed),
+ * poi accesso a Firebase con lo stesso token.
  */
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
   try {
-    isSigningIn = true;
-    const result = await signInWithPopup(auth, provider);
-    const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (!credential?.accessToken) {
-      throw new Error('Impossibile ottenere il token di accesso Google');
-    }
+    await loadGis();
 
-    cachedAccessToken = credential.accessToken;
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(TOKEN_STORAGE_KEY, credential.accessToken);
-      } catch {
-        // Ignore
-      }
+    const accessToken: string = await new Promise((resolve, reject) => {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: `openid email profile ${DRIVE_SCOPE}`,
+        callback: (resp: any) => {
+          if (resp.error) {
+            reject(new Error(resp.error_description || resp.error));
+          } else {
+            resolve(resp.access_token);
+          }
+        },
+        error_callback: (err: any) => {
+          reject(new Error(err?.type === 'popup_closed' ? 'Accesso annullato' : err?.type || 'Errore accesso Google'));
+        },
+      });
+      client.requestAccessToken({ prompt: 'select_account' });
+    });
+
+    const credential = GoogleAuthProvider.credential(null, accessToken);
+    const result = await signInWithCredential(auth, credential);
+
+    cachedAccessToken = accessToken;
+    try {
+      localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
+    } catch {
+      // Ignore
     }
-    return { user: result.user, accessToken: cachedAccessToken };
+    return { user: result.user, accessToken };
   } catch (error: unknown) {
     console.error('Errore durante il login con Google:', error);
     throw error;
-  } finally {
-    isSigningIn = false;
   }
 };
 
-/**
- * Returns the currently cached OAuth access token from persistent storage.
- */
 export const getAccessToken = async (): Promise<string | null> => {
   if (!cachedAccessToken && typeof window !== 'undefined') {
     try {
@@ -135,9 +148,6 @@ export const getAccessToken = async (): Promise<string | null> => {
   return cachedAccessToken;
 };
 
-/**
- * Sets the access token manually in memory and persistent storage.
- */
 export const setCachedAccessToken = (token: string | null) => {
   cachedAccessToken = token;
   if (typeof window !== 'undefined') {
@@ -153,10 +163,15 @@ export const setCachedAccessToken = (token: string | null) => {
   }
 };
 
-/**
- * Signs the user out and clears all cached tokens.
- */
 export const logout = async () => {
+  const token = cachedAccessToken;
+  try {
+    if (token && (window as any).google?.accounts?.oauth2) {
+      google.accounts.oauth2.revoke(token, () => {});
+    }
+  } catch {
+    // Ignore
+  }
   await signOut(auth);
   clearCachedAccessToken();
 };
